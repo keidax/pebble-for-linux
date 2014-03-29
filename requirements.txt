@@ -1,0 +1,10 @@
+twisted==12.0.0
+autobahn==0.5.14
+websocket-client==0.12.0
+sh==1.08
+pyserial>=2.6
+pypng==0.0.16
+# Only if using bluetooth connection to Pebble:
+git+http://github.com/pebble/lightblue-0.4.git#egg=lightblue-0.4
+pybluez
+

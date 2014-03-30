@@ -11,7 +11,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 
 global media_manager, peb
 
-def coolfunc(endpoint, resp):
+def media_endpoint(endpoint, resp):
 
 	if resp == 'PLAYPAUSE':
 		playpause()
@@ -22,13 +22,23 @@ def coolfunc(endpoint, resp):
 	else:
 		print "unknown message: " + resp
 
-	sleep(.5)
+	sleep(1)
 
 	metadata = media_manager.Get('org.mpris.MediaPlayer2.Player', 'Metadata')
-	# peb.set_nowplaying_metadata(metadata['xesam:title'], metadata['xesam:album'], metadata['xesam:artist'][0])
-	# print isinstance(str(metadata['xesam:title']), str), isinstance(str(metadata['xesam:album']), str), isinstance(str(metadata['xesam:artist'][0]), str)
-	# print str(metadata['xesam:title']), str(metadata['xesam:album']), str(metadata['xesam:artist'][0])
-	peb.set_nowplaying_metadata(str(metadata['xesam:title']), str(metadata['xesam:album']), str(metadata['xesam:artist'][0]))
+	
+	title = ""
+	if metadata.has_key('xesam:title'):
+		title = str(metadata['xesam:title'])
+
+	album = ""
+	if metadata.has_key('xesam:album'):
+		album = str(metadata['xesam:album'])
+
+	artist = ""
+	if metadata.has_key('xesam:artist'):
+		artist = str(metadata['xesam:artist'][0]) # Artist is returned as an array
+	
+	peb.set_nowplaying_metadata(title, album, artist)
 
 def playpause():
 	os.system("xdotool key XF86AudioPlay")
@@ -39,8 +49,8 @@ def nextsong():
 def previoussong():
 	os.system("xdotool key XF86AudioPrev")
 
-def randfunc2(arg1, arg2, arg3):
-	print "hi!"
+# def randfunc2(arg1, arg2, arg3):
+# 	print "hi!"
 
 def main():
 	global media_manager, peb
@@ -51,7 +61,7 @@ def main():
 	proxy = bus.get_object('org.mpris.MediaPlayer2.nuvolaplayer', '/org/mpris/MediaPlayer2')
 	media_manager = dbus.Interface(proxy, 'org.freedesktop.DBus.Properties')
 
-	proxy.connect_to_signal('PropertiesChanged', randfunc2)
+	# proxy.connect_to_signal('PropertiesChanged', randfunc2)
 
 	# bus.add_signal_receiver(randfunc2, bus_name="org.mpris.MediaPlayer2.nuvolaplayer",
 	#  dbus_interface = "org.freedesktop.DBus.Properties", signal_name="PropertiesChanged")
@@ -60,7 +70,7 @@ def main():
 	peb.set_print_pbl_logs(True) # Necessary to avoid a crash
 	peb.connect_via_lightblue()
 	print "connected!"
-	peb.register_endpoint("MUSIC_CONTROL", coolfunc)
+	peb.register_endpoint("MUSIC_CONTROL", media_endpoint)
 	# peb._reader()
 
 	print "Press enter to exit: "

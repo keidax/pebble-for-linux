@@ -1,3 +1,4 @@
+#! /usr/bin/python2.7
 # performs a simple device inquiry, followed by a remote name request of each
 # discovered device
 
@@ -6,6 +7,9 @@ import sys
 import struct
 import bluetooth
 import bluetooth._bluetooth as bluez
+from time import sleep
+
+results = []
 
 def printpacket(pkt):
     for c in pkt:
@@ -70,6 +74,8 @@ def write_inquiry_mode(sock, mode):
     return 0
 
 def device_inquiry_with_with_rssi(sock, wanted_addr):
+    global results
+
     # save current filter
     old_filter = sock.getsockopt( bluez.SOL_HCI, bluez.HCI_FILTER, 14)
 
@@ -84,10 +90,9 @@ def device_inquiry_with_with_rssi(sock, wanted_addr):
 
     duration = 4
     max_responses = 255
+    # 0x9e8b33 is the reserved code for general inquiry of Bluetooth devices
     cmd_pkt = struct.pack("BBBBB", 0x33, 0x8b, 0x9e, duration, max_responses)
     bluez.hci_send_cmd(sock, bluez.OGF_LINK_CTL, bluez.OCF_INQUIRY, cmd_pkt)
-
-    results = []
 
     done = False
     while not done:
@@ -99,27 +104,32 @@ def device_inquiry_with_with_rssi(sock, wanted_addr):
             for i in range(nrsp):
                 addr = bluez.ba2str( pkt[1+6*i:1+6*i+6] )
                 rssi = struct.unpack("b", pkt[1+13*nrsp+i])[0]
-                results.append( ( addr, rssi ) )
+                
                 if addr == wanted_addr:
-                    print "[%s] RSSI: [%d]" % (addr, rssi)
+                    results.append( rssi )
+                    # print "*** ",
+                # print "[%s] RSSI: [%d]" % (addr, rssi)
         elif event == bluez.EVT_INQUIRY_COMPLETE:
             done = True
         elif event == bluez.EVT_CMD_STATUS:
             status, ncmd, opcode = struct.unpack("BBH", pkt[3:7])
             if status != 0:
                 print "uh oh..."
-                printpacket(pkt[3:7])
                 done = True
         else:
-            print "unrecognized packet type 0x%02x" % ptype
+            # print "unrecognized packet type 0x%02x" % ptype
+            continue
 
 
     # restore old filter
     sock.setsockopt( bluez.SOL_HCI, bluez.HCI_FILTER, old_filter )
 
+    if len(results) > 10:
+        results = results[-10:]
     return results
 
 #dev_id = bluez.hci_get_route("C4:85:08:0F:E0:05")
+
 try:
     sock = bluez.hci_open_dev()
 except:
@@ -147,5 +157,34 @@ if mode != 1:
         print "error while setting inquiry mode"
     print "result: %d" % result
 
+
+
 while True:
+    # Clear all filters
+    cmd_pkt = struct.pack("B", 0x00)
+    bluez.hci_send_cmd(sock, bluez.OGF_HOST_CTL, bluez.OCF_SET_EVENT_FLT, cmd_pkt)
+
+    # cmd_pkt = struct.pack("BBBBBBBB", 0x02, 0x02, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff)
+    # bluez.hci_send_cmd(sock, bluez.OGF_HOST_CTL, bluez.OCF_SET_EVENT_FLT, cmd_pkt)
+
+    # Set class-of-device filter
+    cmd_pkt = struct.pack("BBBBBBBB", 0x01, 0x01, 0xf0, 0x07, 0x04, 0x00, 0x0f, 0x00)
+    bluez.hci_send_cmd(sock, bluez.OGF_HOST_CTL, bluez.OCF_SET_EVENT_FLT, cmd_pkt)
+
+    # print "inquiring"
     device_inquiry_with_with_rssi(sock, "00:17:E9:4A:64:91")
+    sleep(3)
+    # print results
+
+    avg = -100
+    if len(results) == 0:
+        continue;
+    elif len(results) < 10 :
+        avg = sum(results) / float(len(results))
+    else:
+        avg = sum(results[5:10]) / float(len(results[5:10]))
+    print "avg = " + str(avg)
+    if avg > -50:
+        os.system("pkill i3lock")
+    else:
+        os.system("xautolock -locknow")

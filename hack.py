@@ -10,9 +10,16 @@ from time import sleep
 import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 
-global media_manager, peb
+media_manager = None
+peb = None
+
+pebbles = ['00:17:e9:4a:64:91']
 
 def media_endpoint(endpoint, resp):
+	global media_manager
+
+	if media_manager == None:
+		setup_media_connection()
 
 	if resp == 'PLAYPAUSE':
 		playpause()
@@ -23,7 +30,7 @@ def media_endpoint(endpoint, resp):
 	else:
 		print "unknown message: " + resp
 
-	sleep(1)
+	sleep(1) # Sleep for a bit, so media player has a chance to update before we query metadata again
 
 	metadata = media_manager.Get('org.mpris.MediaPlayer2.Player', 'Metadata')
 	
@@ -41,14 +48,8 @@ def media_endpoint(endpoint, resp):
 	
 	peb.set_nowplaying_metadata(title, album, artist)
 
-def playpause(): os.system("xdotool key XF86AudioPlay")
-
-def nextsong(): os.system("xdotool key XF86AudioNext")
-
-def previoussong(): os.system("xdotool key XF86AudioPrev")
-
-def main():
-	global media_manager, peb
+def setup_media_connection():
+	global media_manager
 
 	dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
@@ -57,6 +58,15 @@ def main():
 	bus = dbus.SessionBus()
 	proxy = bus.get_object('org.mpris.MediaPlayer2.nuvolaplayer', '/org/mpris/MediaPlayer2')
 	media_manager = dbus.Interface(proxy, 'org.freedesktop.DBus.Properties')
+
+def playpause(): os.system("xdotool key XF86AudioPlay")
+
+def nextsong(): os.system("xdotool key XF86AudioNext")
+
+def previoussong(): os.system("xdotool key XF86AudioPrev")
+
+def main():
+	global peb
 
 	peb = pebble.Pebble(id = '00:17:e9:4a:64:91')
 	peb.set_print_pbl_logs(True) # Necessary to avoid a crash
@@ -86,8 +96,5 @@ def main():
 		peb.disconnect()
 
 if __name__ == '__main__':
-	# rssi = subprocess.check_output("hcitool rssi 00:17:e9:4a:64:91")
-	# print rssi
-    sys.exit(main())
-    # main()
+	sys.exit(main())
 

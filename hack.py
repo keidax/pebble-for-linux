@@ -81,21 +81,25 @@ def main():
 	device_found = False;
 	device = ''
 
-	while not device_found:
-		for device in pebbles:
-			try:
-				subprocess.check_call(["sudo","/usr/bin/l2ping", "-c1", device])
-				device_found = True
-				print "Found Pebble " + device
-				break;
-			except CalledProcessError, e:
-				sleep(1)
+	with open(os.devnull, "w") as fnull:
+		while not device_found:
+			for device in pebbles:
+				try:
+					subprocess.check_call(["sudo","/usr/bin/l2ping", "-c1", device], stdout=fnull)
+					device_found = True
+					print "Found Pebble " + device
+					break;
+				except CalledProcessError, e:
+					sleep(1)
 
 	setup_pebble(device)
 
+	results = []
 
 	print "Enter 'q' to exit: "
 	try:
+		last_avg = -100
+		avg = 0
 		while peb._alive:
 			# This will keep looping until the user presses enter
 			# Ugly but it gets the job done
@@ -107,9 +111,29 @@ def main():
 			sleep(.25)
 			try:
 				rssi = subprocess.check_output(["hcitool", "rssi", "00:17:e9:4a:64:91"])
-				print rssi[19:],
+				results.append(int(rssi[19:]))
+				# print rssi[19:],
 			except Exception, e:
 				print e
+
+			if len(results) > 10:
+				results = results[-10:]
+
+			if len(results) == 0:
+				continue;
+			elif len(results) < 10 :
+				avg = sum(results) / float(len(results))
+			else:
+				avg = sum(results[5:10]) / float(len(results[5:10]))
+
+			if avg != last_avg:
+				print "Distance: %.1f" % avg
+			last_avg = avg
+
+			if avg > -2:
+					os.system("pkill i3lock")
+			else:
+					os.system("xautolock -locknow")
 
 		peb.disconnect()
 	except:

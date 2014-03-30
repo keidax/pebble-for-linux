@@ -4,6 +4,7 @@ import os
 import sys
 import select
 import subprocess
+from subprocess import CalledProcessError
 from pebble import pebble
 from evdev import UInput, ecodes as e 
 from time import sleep
@@ -65,14 +66,33 @@ def nextsong(): os.system("xdotool key XF86AudioNext")
 
 def previoussong(): os.system("xdotool key XF86AudioPrev")
 
-def main():
+def setup_pebble(addr):
 	global peb
 
-	peb = pebble.Pebble(id = '00:17:e9:4a:64:91')
+	peb = pebble.Pebble(id = addr)
 	peb.set_print_pbl_logs(True) # Necessary to avoid a crash
 	peb.connect_via_lightblue()
-	print "connected!"
 	peb.register_endpoint("MUSIC_CONTROL", media_endpoint)
+	print "Connected to Pebble!"
+
+def main():
+	global peb, pebbles
+
+	device_found = False;
+	device = ''
+
+	while not device_found:
+		for device in pebbles:
+			try:
+				subprocess.check_call(["sudo","/usr/bin/l2ping", "-c1", device])
+				device_found = True
+				print "Found Pebble " + device
+				break;
+			except CalledProcessError, e:
+				sleep(1)
+
+	setup_pebble(device)
+
 
 	print "Enter 'q' to exit: "
 	try:
